@@ -1,6 +1,26 @@
 # modules/networking/main.tf
 # Module pour la gestion du réseau et sécurité
 # Ce module crée l'infrastructure réseau complète pour notre application
+#
+# 🎯 STRATÉGIE COUNT POUR LA HAUTE DISPONIBILITÉ
+# ===============================================
+# Ce module utilise la variable `count` pour créer une architecture multi-AZ :
+#
+# 📊 RESSOURCES CRÉÉES AVEC COUNT :
+# • 2 sous-réseaux publics (aws_subnet.public)
+# • 2 associations de routage (aws_route_table_association.public)
+#
+# 🔄 FONCTIONNEMENT DE COUNT :
+# • count = 2 → Terraform crée 2 instances de la ressource
+# • count.index → Variable automatique (0, 1, 2...) pour différencier chaque instance
+# • aws_subnet.public[0] → Premier sous-réseau (AZ 1, CIDR 10.0.1.0/24)
+# • aws_subnet.public[1] → Deuxième sous-réseau (AZ 2, CIDR 10.0.2.0/24)
+#
+# 🌍 AVANTAGES MULTI-AZ :
+# • Haute disponibilité : Si une AZ tombe, l'autre continue
+# • Distribution géographique : Résilience aux pannes datacenter
+# • Load balancing : Trafic réparti sur plusieurs zones
+# • Conformité : Respect des bonnes pratiques AWS
 
 # ========================================
 # DÉTECTION AUTOMATIQUE DES ZONES DE DISPONIBILITÉ
@@ -61,29 +81,58 @@ resource "aws_internet_gateway" "main" {
 # Crée 2 sous-réseaux publics dans différentes zones de disponibilité
 # Cela assure la haute disponibilité de notre application
 resource "aws_subnet" "public" {
-  # Crée 2 sous-réseaux (count = 2)
+  
+  # ========================================
+  # MÉTA-ARGUMENT COUNT : CRÉATION MULTIPLE
+  # ========================================
+  
+  # count = 2 signifie "créer 2 instances de cette ressource"
+  # Terraform va exécuter ce bloc 2 fois avec count.index = 0, puis count.index = 1
   count = 2
+  
+  # ========================================
+  # CONFIGURATION DE BASE (IDENTIQUE POUR TOUS)
+  # ========================================
 
-  # Associe chaque sous-réseau à notre VPC
+  # Associe chaque sous-réseau à notre VPC (même VPC pour tous)
   vpc_id = aws_vpc.main.id
   
-  # Calcule automatiquement le CIDR de chaque sous-réseau
-  # Subnet 1: 10.0.1.0/24 (256 IPs), Subnet 2: 10.0.2.0/24 (256 IPs)
+  # ========================================
+  # CONFIGURATION DYNAMIQUE (DIFFÉRENTE POUR CHAQUE)
+  # ========================================
+  
+  # Calcule automatiquement le CIDR de chaque sous-réseau en utilisant count.index
+  # count.index = 0 → "10.0.${0 + 1}.0/24" = "10.0.1.0/24" (Subnet 1)
+  # count.index = 1 → "10.0.${1 + 1}.0/24" = "10.0.2.0/24" (Subnet 2)
+  # Résultat : 2 sous-réseaux avec des plages IP différentes
   cidr_block = "10.0.${count.index + 1}.0/24"
   
-  # Place chaque sous-réseau dans une zone de disponibilité différente
-  # Améliore la résilience en cas de panne d'une zone
+  # Sélectionne une zone de disponibilité différente pour chaque sous-réseau
+  # count.index = 0 → data.aws_availability_zones.available.names[0] (ex: us-east-1a)
+  # count.index = 1 → data.aws_availability_zones.available.names[1] (ex: us-east-1b)
+  # Résultat : Distribution géographique pour haute disponibilité
   availability_zone = data.aws_availability_zones.available.names[count.index]
   
   # NE PAS attribuer d'IP publique automatiquement aux instances
   # Sécurité renforcée : les instances n'auront pas d'accès direct à Internet
   map_public_ip_on_launch = false
 
-  # Tags pour identifier chaque sous-réseau
+  # ========================================
+  # TAGS DYNAMIQUES (UTILISATION DE COUNT.INDEX)
+  # ========================================
+  
+  # Tags pour identifier chaque sous-réseau individuellement
   tags = merge(var.common_tags, {
-    Name = "${var.project_name}-${var.environment}-public-subnet-${count.index + 1}"  # Nom unique
-    Type = "PublicSubnet"  # Type de sous-réseau
-    AZ   = data.aws_availability_zones.available.names[count.index]  # Zone de disponibilité
+    # Nom unique pour chaque sous-réseau utilisant count.index
+    # count.index = 0 → "projet-dev-public-subnet-1"
+    # count.index = 1 → "projet-dev-public-subnet-2"
+    Name = "${var.project_name}-${var.environment}-public-subnet-${count.index + 1}"
+    
+    Type = "PublicSubnet"  # Type identique pour tous
+    
+    # Zone de disponibilité spécifique à chaque sous-réseau
+    # Utilise le même index que pour availability_zone
+    AZ = data.aws_availability_zones.available.names[count.index]
   })
 }
 
@@ -121,10 +170,23 @@ resource "aws_route_table" "public" {
 # Associe chaque sous-réseau public à la table de routage publique
 # Sans cette association, les sous-réseaux ne sauraient pas comment router le trafic
 resource "aws_route_table_association" "public" {
-  # Crée une association pour chaque sous-réseau (2 associations)
+  
+  # ========================================
+  # COUNT SYNCHRONISÉ AVEC LES SOUS-RÉSEAUX
+  # ========================================
+  
+  # IMPORTANT : count = 2 doit correspondre au count des sous-réseaux
+  # Crée une association pour chaque sous-réseau créé précédemment
   count = 2
 
-  # ID du sous-réseau à associer (utilise l'index pour parcourir les 2 sous-réseaux)
+  # ========================================
+  # RÉFÉRENCE AUX RESSOURCES CRÉÉES PAR COUNT
+  # ========================================
+  
+  # Référence les sous-réseaux créés précédemment avec count
+  # aws_subnet.public[0] → Premier sous-réseau (count.index = 0)
+  # aws_subnet.public[1] → Deuxième sous-réseau (count.index = 1)
+  # La notation [count.index] permet de référencer la bonne instance
   subnet_id = aws_subnet.public[count.index].id
   
   # ID de la table de routage à associer
