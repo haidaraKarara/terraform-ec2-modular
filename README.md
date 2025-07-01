@@ -174,11 +174,11 @@ allowed_http_cidrs = ["0.0.0.0/0"]
 enable_https = false
 health_check_path = "/"
 
-# Configuration Auto Scaling
+# Configuration Auto Scaling (Haute Disponibilité)
 enable_auto_scaling = true
-asg_min_size = 1
-asg_max_size = 2
-asg_desired_capacity = 1
+asg_min_size = 2                  # Minimum 2 instances pour HA
+asg_max_size = 3                  # Maximum 3 instances
+asg_desired_capacity = 2          # 2 instances actives (multi-AZ)
 
 # Tags personnalisés
 common_tags = {
@@ -281,8 +281,8 @@ terraform apply
 - Health checks et monitoring
 
 **Différences (paramètres uniquement) :**
-- **Instances** : 1-2 en dev, 2-4 en prod
-- **HTTPS** : désactivé en dev, activé en prod
+- **Instances** : 2-3 en dev, 2-4 en prod
+- **HTTPS** : désactivé en dev, activé en prod  
 - **Tags** : Environment = "dev" vs "prod"
 
 **Avantages :**

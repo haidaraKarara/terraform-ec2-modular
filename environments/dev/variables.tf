@@ -115,27 +115,27 @@ variable "enable_auto_scaling" {
 }
 
 # Nombre minimum d'instances que l'ASG doit maintenir
-# Même en cas de problème, au moins cette quantité sera maintenue
+# HAUTE DISPONIBILITÉ : Au moins 2 instances pour éviter le SPOF (Single Point of Failure)
 variable "asg_min_size" {
-  description = "Nombre minimum d'instances dans l'Auto Scaling Group"
+  description = "Nombre minimum d'instances dans l'Auto Scaling Group (HA requis: min 2)"
   type        = number
-  default     = 1  # Minimum pour le développement
+  default     = 2  # MINIMUM 2 pour la haute disponibilité
 }
 
 # Nombre maximum d'instances que l'ASG peut créer
-# Limite les coûts en empêchant une escalade incontrôlée
+# Permet l'auto-scaling en cas de charge tout en limitant les coûts
 variable "asg_max_size" {
   description = "Nombre maximum d'instances dans l'Auto Scaling Group"
   type        = number
-  default     = 2  # Limite raisonnable pour le dev
+  default     = 3  # Permet scaling jusqu'à 3 instances
 }
 
 # Nombre d'instances que l'ASG essaie de maintenir en permanence
-# Doit être entre min_size et max_size
+# HAUTE DISPONIBILITÉ : 2 instances dans 2 AZ différentes
 variable "asg_desired_capacity" {
-  description = "Nombre désiré d'instances dans l'Auto Scaling Group"
+  description = "Nombre désiré d'instances dans l'Auto Scaling Group (HA: 2 instances)"
   type        = number
-  default     = 1  # Une seule instance pour le développement
+  default     = 2  # 2 instances pour redondance multi-AZ
 }
 
 # ========================================

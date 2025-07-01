@@ -11,11 +11,11 @@ allowed_http_cidrs = ["0.0.0.0/0"]  # Accès HTTP depuis internet
 enable_https = false                # HTTPS désactivé en dev
 health_check_path = "/"            # Path pour les health checks
 
-# Configuration Auto Scaling
+# Configuration Auto Scaling (Haute Disponibilité)
 enable_auto_scaling = true         # Utiliser Auto Scaling Group
-asg_min_size = 1                  # Minimum 1 instance
-asg_max_size = 2                  # Maximum 2 instances  
-asg_desired_capacity = 1          # 1 instance désirée
+asg_min_size = 2                  # Minimum 2 instances (HA)
+asg_max_size = 3                  # Maximum 3 instances  
+asg_desired_capacity = 2          # 2 instances désirées (multi-AZ)
 
 # IP élastique (pour instances standalone uniquement)
 create_eip = false                # Pas d'EIP en mode Auto Scaling
