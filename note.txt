@@ -1,0 +1,8 @@
+terraform init \
+  -backend-config="bucket=mon-tfstate-bucket" \
+  -backend-config="key=envs/dev/terraform.tfstate" \
+  -backend-config="region=us-east-1" \
+  -backend-config="encrypt=true" \
+  -backend-config="dynamodb_table=terraform-lock-table"
+
+ Samsung 43″ TU7002 / AU7000

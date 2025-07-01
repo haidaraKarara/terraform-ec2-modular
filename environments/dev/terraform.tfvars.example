@@ -1,0 +1,28 @@
+# environments/dev/terraform.tfvars.example
+# Exemple de configuration pour l'environnement dev
+
+aws_region = "us-east-1"
+project_name = "terraform-modular"
+environment = "dev"
+instance_type = "t2.micro"
+
+# Configuration Load Balancer
+allowed_http_cidrs = ["0.0.0.0/0"]  # Accès HTTP depuis internet
+enable_https = false                # HTTPS désactivé en dev
+health_check_path = "/"            # Path pour les health checks
+
+# Configuration Auto Scaling
+enable_auto_scaling = true         # Utiliser Auto Scaling Group
+asg_min_size = 1                  # Minimum 1 instance
+asg_max_size = 2                  # Maximum 2 instances  
+asg_desired_capacity = 1          # 1 instance désirée
+
+# IP élastique (pour instances standalone uniquement)
+create_eip = false                # Pas d'EIP en mode Auto Scaling
+
+common_tags = {
+  Terraform   = "true"
+  Project     = "terraform-modular"
+  Environment = "dev"
+  Owner       = "YOUR_NAME"
+}

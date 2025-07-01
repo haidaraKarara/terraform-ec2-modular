@@ -1,0 +1,29 @@
+# environments/prod/terraform.tfvars.example
+# Exemple de configuration pour l'environnement prod
+
+aws_region = "us-east-1"
+project_name = "terraform-modular"
+environment = "prod"
+instance_type = "t2.micro"
+
+# Configuration Load Balancer
+allowed_http_cidrs = ["0.0.0.0/0"]  # Accès HTTP depuis internet
+enable_https = true                 # HTTPS activé en production
+health_check_path = "/"            # Path pour les health checks
+
+# Configuration Auto Scaling
+enable_auto_scaling = true          # Utiliser Auto Scaling Group
+asg_min_size = 2                   # Minimum 2 instances pour HA
+asg_max_size = 4                   # Maximum 4 instances
+asg_desired_capacity = 2           # 2 instances désirées
+
+# IP élastique (pour instances standalone uniquement)
+create_eip = false                 # Pas d'EIP en mode Auto Scaling
+
+common_tags = {
+  Terraform   = "true"
+  Project     = "terraform-modular"
+  Environment = "prod"
+  Owner       = "YOUR_NAME"
+  CostCenter  = "YOUR_COST_CENTER"
+}
