@@ -23,6 +23,16 @@ variable "project_name" {
   description = "Nom du projet - utilisé comme préfixe pour toutes les ressources créées"
   type        = string
   # Pas de valeur par défaut = variable obligatoire
+  
+  validation {
+    condition = length(var.project_name) >= 3 && length(var.project_name) <= 30
+    error_message = "Le nom du projet doit contenir entre 3 et 30 caractères."
+  }
+  
+  validation {
+    condition = can(regex("^[a-z0-9-]+$", var.project_name))
+    error_message = "Le nom du projet ne peut contenir que des lettres minuscules, chiffres et tirets (ex: mon-projet, webapp-2024)."
+  }
 }
 
 # ENVIRONNEMENT DE DÉPLOIEMENT
@@ -32,6 +42,11 @@ variable "environment" {
   description = "Environnement de déploiement (dev, staging, prod) - utilisé pour nommer et taguer les ressources"
   type        = string
   # Pas de valeur par défaut = variable obligatoire
+  
+  validation {
+    condition = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "L'environnement doit être 'dev', 'staging' ou 'prod'."
+  }
 }
 
 # ========================================================================================================
@@ -48,6 +63,11 @@ variable "instance_type" {
   description = "Type d'instance EC2 - détermine CPU, RAM et performances réseau (ex: t2.micro, t3.small, t3.medium)"
   type        = string
   default     = "t2.micro"  # Valeur par défaut = économique et éligible au niveau gratuit
+  
+  validation {
+    condition = can(regex("^[tm][0-9][a-z]?\\.(nano|micro|small|medium|large|xlarge|[0-9]+xlarge)$", var.instance_type))
+    error_message = "Le type d'instance doit être un type EC2 valide (ex: t2.micro, t3.small, m5.large, c5.xlarge)."
+  }
 }
 
 # ========================================================================================================
@@ -108,6 +128,11 @@ variable "root_volume_size" {
   description = "Taille du volume EBS racine en gigaoctets - minimum 8 GB pour Amazon Linux 2"
   type        = number
   default     = 8  # Minimum requis pour Amazon Linux 2
+  
+  validation {
+    condition = var.root_volume_size >= 8 && var.root_volume_size <= 100
+    error_message = "La taille du volume racine doit être entre 8 GB (minimum pour Amazon Linux 2) et 100 GB."
+  }
 }
 
 # CHIFFREMENT DU VOLUME
@@ -177,6 +202,11 @@ variable "asg_min_size" {
   description = "Nombre minimum d'instances dans l'ASG - maintenu en permanence même en cas de faible charge"
   type        = number
   default     = 1  # Au moins 1 instance pour éviter les interruptions
+  
+  validation {
+    condition = var.asg_min_size >= 1 && var.asg_min_size <= 6
+    error_message = "asg_min_size doit être entre 1 et 6 instances."
+  }
 }
 
 # NOMBRE MAXIMUM D'INSTANCES
@@ -186,6 +216,11 @@ variable "asg_max_size" {
   description = "Nombre maximum d'instances dans l'ASG - limite les coûts lors des pics de charge"
   type        = number
   default     = 2  # Maximum 2 instances par défaut pour contrôler les coûts
+  
+  validation {
+    condition = var.asg_max_size >= 1 && var.asg_max_size <= 6
+    error_message = "asg_max_size doit être entre 1 et 6 instances."
+  }
 }
 
 # NOMBRE DÉSIRÉ D'INSTANCES
@@ -195,4 +230,9 @@ variable "asg_desired_capacity" {
   description = "Nombre désiré d'instances dans l'ASG - cible normale, doit être entre min_size et max_size"
   type        = number
   default     = 1  # 1 instance par défaut, peut être augmenté selon les besoins
+  
+  validation {
+    condition = var.asg_desired_capacity >= 0 && var.asg_desired_capacity <= 6
+    error_message = "asg_desired_capacity doit être entre 0 et 6 instances."
+  }
 }

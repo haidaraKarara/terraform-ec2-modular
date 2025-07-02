@@ -12,6 +12,16 @@ variable "project_name" {
   description = "Nom du projet utilisé pour le naming des ressources ALB"
   type        = string
   # OBLIGATOIRE: doit être fourni par l'environnement appelant
+  
+  validation {
+    condition = length(var.project_name) >= 3 && length(var.project_name) <= 30
+    error_message = "Le nom du projet doit contenir entre 3 et 30 caractères."
+  }
+  
+  validation {
+    condition = can(regex("^[a-z0-9-]+$", var.project_name))
+    error_message = "Le nom du projet ne peut contenir que des lettres minuscules, chiffres et tirets (ex: mon-projet, webapp-2024)."
+  }
 }
 
 # Environnement de déploiement - permet la séparation des ressources
@@ -20,6 +30,11 @@ variable "environment" {
   description = "Environnement de déploiement (dev, staging, prod)"
   type        = string
   # OBLIGATOIRE: doit être fourni par l'environnement appelant
+  
+  validation {
+    condition = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "L'environnement doit être 'dev', 'staging' ou 'prod'."
+  }
 }
 
 # ID du VPC où déployer l'ALB - fourni par le module networking
@@ -36,6 +51,11 @@ variable "vpc_cidr" {
   description = "Bloc CIDR du VPC pour les règles de sécurité"
   type        = string
   # OBLIGATOIRE: fourni par la configuration de l'environnement
+  
+  validation {
+    condition = can(cidrhost(var.vpc_cidr, 0))
+    error_message = "Le vpc_cidr doit être un bloc CIDR valide (ex: 10.0.0.0/16, 172.16.0.0/12, 192.168.0.0/16)."
+  }
 }
 
 # IDs des sous-réseaux publics - fournis par le module networking
@@ -56,6 +76,16 @@ variable "health_check_path" {
   description = "Chemin URL pour les health checks (ex: '/', '/health', '/status')"
   type        = string
   default     = "/"  # Par défaut: page d'accueil
+  
+  validation {
+    condition = can(regex("^/.*", var.health_check_path))
+    error_message = "Le chemin de health check doit commencer par '/' (ex: '/', '/health', '/api/status')."
+  }
+  
+  validation {
+    condition = length(var.health_check_path) <= 100
+    error_message = "Le chemin de health check ne peut pas dépasser 100 caractères."
+  }
 }
 
 # Activer ou désactiver le support HTTPS (port 443)

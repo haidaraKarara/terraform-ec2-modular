@@ -94,6 +94,20 @@ Each environment requires configuration of:
 - `asg_min_size`, `asg_max_size`, `asg_desired_capacity`: Auto Scaling Group sizing parameters
 - `common_tags`: Tags applied to all resources
 
+### Variable Validation
+The project includes comprehensive variable validation to prevent configuration errors:
+- **AWS Region**: Validates against supported AWS regions
+- **Project Name**: Must be 3-30 characters, lowercase letters, numbers, and hyphens only
+- **Environment**: Must be 'dev', 'staging', or 'prod'
+- **VPC CIDR**: Validates CIDR format and subnet mask (between /16 and /28)
+- **Instance Type**: Validates EC2 instance type format
+- **CIDR Lists**: Validates all CIDR blocks in allowed_http_cidrs
+- **ASG Sizing**: Validates min/max/desired capacity relationships (max 6 instances)
+- **Health Check Path**: Must start with '/' and be under 100 characters
+- **Volume Size**: Root volume must be 8-100 GB
+
+All validations provide clear error messages in French to help troubleshoot configuration issues.
+
 ### Security Requirements
 - **Access via AWS Systems Manager Session Manager only** - no SSH keys or open ports required
 - SSH port 22 is closed by default

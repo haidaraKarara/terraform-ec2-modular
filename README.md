@@ -26,6 +26,8 @@ terraform output alb_url
 
 > 📝 **Note :** L'application déployée est un serveur web Apache avec une page d'accueil personnalisée qui affiche les informations de l'instance (ID, AZ, IP, etc.). Parfait pour tester le Load Balancer et l'Auto Scaling !
 
+> ✅ **Validation automatique :** Le projet inclut désormais une validation complète des variables pour éviter les erreurs de configuration. Les messages d'erreur sont clairs et en français pour faciliter le troubleshooting.
+
 ---
 
 ## 📋 Table des matières

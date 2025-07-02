@@ -16,11 +16,11 @@ provider "aws" {
   # ========================================
   # TAGS PAR DÉFAUT POUR TOUTES LES RESSOURCES
   # ========================================
-  
+
   # Ces tags sont automatiquement appliqués à TOUTES les ressources créées
   # Très utile pour: facturation, organisation, conformité, automation
   default_tags {
-    tags = var.common_tags  # Tags définis dans variables.tf
+    tags = var.common_tags # Tags définis dans variables.tf
   }
 }
 
@@ -39,12 +39,12 @@ module "networking" {
   source = "../../modules/networking"
 
   # Variables passées au module networking
-  project_name       = var.project_name        # Nom du projet pour le naming
-  environment        = var.environment         # Environnement (dev, prod)
-  vpc_cidr           = var.vpc_cidr            # Plage d'IPs du VPC
-  allowed_http_cidrs = var.allowed_http_cidrs  # IPs autorisées pour HTTP/HTTPS
+  project_name       = var.project_name       # Nom du projet pour le naming
+  environment        = var.environment        # Environnement (dev, prod)
+  vpc_cidr           = var.vpc_cidr           # Plage d'IPs du VPC
+  allowed_http_cidrs = var.allowed_http_cidrs # IPs autorisées pour HTTP/HTTPS
   enable_https       = var.enable_https       # Activer le port 443
-  common_tags        = var.common_tags         # Tags à appliquer
+  common_tags        = var.common_tags        # Tags à appliquer
 }
 
 # ========================================
@@ -59,25 +59,25 @@ module "networking" {
 module "load_balancer" {
   # Chemin vers le code du module load-balancer
   source = "../../modules/load-balancer"
-  
+
   # Variables de configuration de base
-  project_name = var.project_name  # Nom du projet
-  environment  = var.environment   # Environnement (dev)
-  
+  project_name = var.project_name # Nom du projet
+  environment  = var.environment  # Environnement (dev)
+
   # Variables réseau (récupérées depuis le module networking)
-  vpc_id            = module.networking.vpc_id      # ID du VPC créé
-  vpc_cidr          = var.vpc_cidr                  # CIDR du VPC
-  public_subnet_ids = module.networking.subnet_ids  # IDs des sous-réseaux
-  
+  vpc_id            = module.networking.vpc_id     # ID du VPC créé
+  vpc_cidr          = var.vpc_cidr                 # CIDR du VPC
+  public_subnet_ids = module.networking.subnet_ids # IDs des sous-réseaux
+
   # Configuration du load balancer
-  health_check_path = var.health_check_path  # Chemin pour vérifier la santé
+  health_check_path = var.health_check_path # Chemin pour vérifier la santé
   enable_https      = var.enable_https      # Activer HTTPS
   common_tags       = var.common_tags       # Tags à appliquer
-  
+
   # ========================================
   # DÉPENDANCES EXPLICITES
   # ========================================
-  
+
   # Assure que le module networking est créé AVANT le load balancer
   # Nécessaire car le LB a besoin du VPC et des sous-réseaux
   depends_on = [module.networking]
@@ -99,43 +99,43 @@ module "compute" {
   # ========================================
   # CONFIGURATION DE BASE DES INSTANCES
   # ========================================
-  
-  project_name = var.project_name  # Nom du projet
-  environment  = var.environment   # Environnement (dev)
+
+  project_name  = var.project_name  # Nom du projet
+  environment   = var.environment   # Environnement (dev)
   instance_type = var.instance_type # Type d'instance (t2.micro)
-  
+
   # ========================================
   # CONFIGURATION RÉSEAU ET SÉCURITÉ
   # ========================================
-  
+
   # Security Group créé par le module networking
   security_group_id = module.networking.security_group_id
-  
+
   # Premier sous-réseau pour les instances standalone
   # [0] = prend le premier élément de la liste des sous-réseaux
   subnet_id = module.networking.subnet_ids[0]
-  
+
   # ========================================
   # CONFIGURATION OPTIONNELLE
   # ========================================
-  
-  create_eip  = var.create_eip   # Créer une IP élastique
-  common_tags = var.common_tags  # Tags à appliquer
-  
+
+  create_eip  = var.create_eip  # Créer une IP élastique
+  common_tags = var.common_tags # Tags à appliquer
+
   # ========================================
   # CONFIGURATION AUTO SCALING GROUP
   # ========================================
-  
+
   # Activer ou désactiver l'Auto Scaling Group
   enable_auto_scaling = var.enable_auto_scaling
-  
+
   # TOUS les sous-réseaux pour distribuer les instances ASG
   subnet_ids = module.networking.subnet_ids
-  
+
   # Target Group du Load Balancer pour enregistrer les instances
   # Logique conditionnelle: seulement si Auto Scaling est activé
   target_group_arns = var.enable_auto_scaling ? [module.load_balancer.target_group_arn] : []
-  
+
   # Paramètres de dimensionnement de l'ASG
   asg_min_size         = var.asg_min_size         # Minimum d'instances
   asg_max_size         = var.asg_max_size         # Maximum d'instances
@@ -144,7 +144,7 @@ module "compute" {
   # ========================================
   # DÉPENDANCES EXPLICITES
   # ========================================
-  
+
   # Assure que networking ET load_balancer sont créés avant compute
   # Nécessaire car les instances ont besoin du réseau et du target group
   depends_on = [module.networking, module.load_balancer]
