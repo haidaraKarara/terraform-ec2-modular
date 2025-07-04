@@ -63,3 +63,4 @@ logs/
 *.tmp
 *.temp
 .temp/
+note.txt
