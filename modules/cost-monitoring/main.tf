@@ -37,13 +37,8 @@ resource "aws_budgets_budget" "main_budget" {
   
   # Filtrer par environnement
   cost_filter {
-    name   = "TagKey"
-    values = ["Environment"]
-  }
-  
-  cost_filter {
-    name   = "TagValue"
-    values = [var.environment]
+    name   = "TagKeyValue"
+    values = ["Environment$${var.environment}"]
   }
   
   # Alertes par email
@@ -94,13 +89,8 @@ resource "aws_budgets_budget" "ec2_budget" {
   }
   
   cost_filter {
-    name   = "TagKey"
-    values = ["Environment"]
-  }
-  
-  cost_filter {
-    name   = "TagValue"
-    values = [var.environment]
+    name   = "TagKeyValue"
+    values = ["Environment$${var.environment}"]
   }
   
   # Alertes EC2
