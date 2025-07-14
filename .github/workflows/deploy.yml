@@ -29,7 +29,6 @@ on:
 
 env:
   TF_VERSION: '1.9.0'
-  AWS_REGION: 'us-east-1'
 
 jobs:
   bootstrap:
@@ -37,9 +36,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action != 'destroy')
     
+    permissions:
+      id-token: write
+      contents: read
+    
     strategy:
       matrix:
-        environment: [dev, prod]
+        environment: [dev]
     
     steps:
     - name: Checkout
@@ -53,9 +56,8 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ vars.AWS_REGION }}
         
     - name: Bootstrap ${{ matrix.environment }} backend
       run: |
@@ -70,9 +72,13 @@ jobs:
     needs: bootstrap
     if: always() && (needs.bootstrap.result == 'success' || needs.bootstrap.result == 'skipped')
     
+    permissions:
+      id-token: write
+      contents: read
+    
     strategy:
       matrix:
-        environment: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.environment)) || fromJSON('["dev", "prod"]') }}
+        environment: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.environment)) || fromJSON('["dev"]') }}
     
     steps:
     - name: Checkout
@@ -86,9 +92,8 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ vars.AWS_REGION }}
         
     - name: Setup terraform.tfvars for ${{ matrix.environment }}
       run: |
