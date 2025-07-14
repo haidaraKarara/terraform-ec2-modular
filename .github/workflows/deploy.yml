@@ -34,7 +34,7 @@ jobs:
   bootstrap:
     name: 'Bootstrap Backend'
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action != 'destroy')
+    if: false  # Skip bootstrap - should be done manually once
     environment: ${{ matrix.environment }}
     
     permissions:
@@ -64,8 +64,15 @@ jobs:
       run: |
         cd bootstrap/${{ matrix.environment }}
         terraform init
-        terraform plan -out=tfplan
-        terraform apply -auto-approve tfplan
+        
+        # Check if resources already exist
+        if terraform plan -detailed-exitcode; then
+          echo "Bootstrap resources already exist and are up-to-date"
+        else
+          echo "Applying bootstrap configuration..."
+          terraform plan -out=tfplan
+          terraform apply -auto-approve tfplan
+        fi
 
   deploy:
     name: 'Deploy Infrastructure'
