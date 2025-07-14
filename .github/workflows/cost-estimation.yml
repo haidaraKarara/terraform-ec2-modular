@@ -1,4 +1,4 @@
-name: 'Terraform Cost Estimation'
+name: 'Terraform Cost Estimation '
 
 on:
   pull_request:
