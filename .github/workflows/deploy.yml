@@ -175,7 +175,7 @@ jobs:
         
         # Get outputs if apply was successful
         if [ "${{ github.event.inputs.action }}" != "destroy" ]; then
-          echo "### 📊 Infrastructure Outputs" >> deployment-summary.md
+          echo "### Infrastructure Outputs" >> deployment-summary.md
           echo "" >> deployment-summary.md
           echo '```' >> deployment-summary.md
           terraform output >> deployment-summary.md
