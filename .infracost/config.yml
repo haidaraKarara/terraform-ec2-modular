@@ -1,0 +1,29 @@
+# Infracost configuration for cost estimation
+version: 0.1
+
+projects:
+  # Development environment
+  - path: environments/dev
+    name: terraform-ec2-modular-dev
+    terraform_var_files:
+      - terraform.tfvars
+    
+  # Production environment  
+  - path: environments/prod
+    name: terraform-ec2-modular-prod
+    terraform_var_files:
+      - terraform.tfvars
+
+# Cost estimation settings
+settings:
+  # Currency to display costs in
+  currency: USD
+  
+  # Show usage-based costs
+  usage_based_estimates: true
+  
+  # Cost threshold for warnings (monthly)
+  monthly_cost_threshold: 100
+  
+  # Enable detailed cost breakdown
+  detailed_cost_breakdown: true

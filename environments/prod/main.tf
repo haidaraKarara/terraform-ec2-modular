@@ -150,3 +150,37 @@ module "compute" {
   # ESSENTIEL en production pour éviter les échecs de déploiement
   depends_on = [module.networking, module.load_balancer]
 }
+
+# ========================================
+# MODULE COST MONITORING (SURVEILLANCE DES COÛTS PRODUCTION)
+# ========================================
+
+# Le module cost_monitoring gère la surveillance des coûts en production :
+# - Budgets AWS avec alertes proactives
+# - Surveillance CloudWatch des coûts estimés
+# - Notifications par email en cas de dépassement
+# - Rapports de coûts automatisés pour la gouvernance financière
+module "cost_monitoring" {
+  # Chemin vers le code du module cost-monitoring
+  source = "../../modules/cost-monitoring"
+  
+  # Configuration de base
+  project_name = var.project_name  # Nom du projet
+  environment  = var.environment   # Environnement (prod)
+  
+  # Budgets production (plus élevés qu'en dev)
+  budget_limit     = 500  # Budget mensuel principal production
+  ec2_budget_limit = 300  # Budget spécifique EC2 production
+  
+  # Alertes critiques pour la production
+  alert_emails = ["ababacarhaidara@gmail.com", "finance@company.com"]
+  
+  # Seuils d'alerte adaptés à la production
+  cost_alert_threshold = 400  # Alerte à 400 USD
+  
+  # Rapports détaillés activés pour la prod
+  enable_detailed_billing = true
+  
+  # Tags de production
+  common_tags = var.common_tags
+}

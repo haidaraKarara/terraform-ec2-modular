@@ -149,3 +149,13 @@ module "compute" {
   # Nécessaire car les instances ont besoin du réseau et du target group
   depends_on = [module.networking, module.load_balancer]
 }
+
+module "cost_monitoring" {
+  source = "../../modules/cost-monitoring"
+  
+  project_name     = var.project_name
+  environment      = var.environment
+  budget_limit     = 100
+  alert_emails     = ["ababacarhaidara@gmail.com"]
+  common_tags      = var.common_tags
+}

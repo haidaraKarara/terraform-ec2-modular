@@ -1,0 +1,185 @@
+name: 'Deploy Infrastructure'
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+      - 'bootstrap/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - 'dev'
+          - 'prod'
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+          - 'plan'
+          - 'apply'
+          - 'destroy'
+
+env:
+  TF_VERSION: '1.9.0'
+  AWS_REGION: 'us-east-1'
+
+jobs:
+  bootstrap:
+    name: 'Bootstrap Backend'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action != 'destroy')
+    
+    strategy:
+      matrix:
+        environment: [dev, prod]
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Bootstrap ${{ matrix.environment }} backend
+      run: |
+        cd bootstrap/${{ matrix.environment }}
+        terraform init
+        terraform plan -out=tfplan
+        terraform apply -auto-approve tfplan
+
+  deploy:
+    name: 'Deploy Infrastructure'
+    runs-on: ubuntu-latest
+    needs: bootstrap
+    if: always() && (needs.bootstrap.result == 'success' || needs.bootstrap.result == 'skipped')
+    
+    strategy:
+      matrix:
+        environment: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.environment)) || fromJSON('["dev", "prod"]') }}
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Setup terraform.tfvars for ${{ matrix.environment }}
+      run: |
+        cd environments/${{ matrix.environment }}
+        
+        # Generate terraform.tfvars from GitHub variables only
+        cat > terraform.tfvars << EOF
+        aws_region = "${{ vars.AWS_REGION }}"
+        project_name = "${{ vars.PROJECT_NAME }}"
+        environment = "${{ matrix.environment }}"
+        
+        # Network configuration
+        vpc_cidr = "${{ vars.VPC_CIDR }}"
+        
+        # Instance configuration
+        instance_type = "${{ matrix.environment == 'prod' && vars.PROD_INSTANCE_TYPE || vars.DEV_INSTANCE_TYPE }}"
+        enable_auto_scaling = ${{ vars.ENABLE_AUTO_SCALING }}
+        
+        # Auto Scaling configuration
+        asg_min_size = ${{ matrix.environment == 'prod' && vars.PROD_ASG_MIN_SIZE || vars.DEV_ASG_MIN_SIZE }}
+        asg_max_size = ${{ matrix.environment == 'prod' && vars.PROD_ASG_MAX_SIZE || vars.DEV_ASG_MAX_SIZE }}
+        asg_desired_capacity = ${{ matrix.environment == 'prod' && vars.PROD_ASG_DESIRED_CAPACITY || vars.DEV_ASG_DESIRED_CAPACITY }}
+        
+        # Load balancer configuration
+        allowed_http_cidrs = ${{ vars.ALLOWED_HTTP_CIDRS }}
+        enable_https = ${{ vars.ENABLE_HTTPS }}
+        health_check_path = "${{ vars.HEALTH_CHECK_PATH }}"
+        
+        common_tags = {
+          Project = "${{ vars.PROJECT_NAME }}"
+          Environment = "${{ matrix.environment }}"
+          ManagedBy = "terraform"
+          DeployedBy = "github-actions"
+          Repository = "${{ github.repository }}"
+        }
+        EOF
+        
+    - name: Terraform Init
+      run: |
+        cd environments/${{ matrix.environment }}
+        terraform init
+        
+    - name: Terraform Plan
+      id: plan
+      run: |
+        cd environments/${{ matrix.environment }}
+        terraform plan -out=tfplan -detailed-exitcode
+      continue-on-error: true
+        
+    - name: Terraform Apply
+      if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+      run: |
+        cd environments/${{ matrix.environment }}
+        terraform apply -auto-approve tfplan
+        
+    - name: Terraform Destroy
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+      run: |
+        cd environments/${{ matrix.environment }}
+        terraform destroy -auto-approve
+        
+    - name: Generate deployment summary
+      if: steps.plan.outcome == 'success'
+      run: |
+        cd environments/${{ matrix.environment }}
+        
+        echo "## 🚀 Deployment Summary - ${{ matrix.environment }}" > deployment-summary.md
+        echo "" >> deployment-summary.md
+        
+        # Get outputs if apply was successful
+        if [ "${{ github.event.inputs.action }}" != "destroy" ]; then
+          echo "### 📊 Infrastructure Outputs" >> deployment-summary.md
+          echo "" >> deployment-summary.md
+          echo '```' >> deployment-summary.md
+          terraform output >> deployment-summary.md
+          echo '```' >> deployment-summary.md
+          echo "" >> deployment-summary.md
+        fi
+        
+        # Resource summary
+        echo "### 📋 Resource Summary" >> deployment-summary.md
+        echo "" >> deployment-summary.md
+        echo '```' >> deployment-summary.md
+        terraform state list >> deployment-summary.md
+        echo '```' >> deployment-summary.md
+        
+    - name: Upload deployment artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-${{ matrix.environment }}-${{ github.run_id }}
+        path: |
+          environments/${{ matrix.environment }}/tfplan
+          environments/${{ matrix.environment }}/deployment-summary.md
+        retention-days: 30

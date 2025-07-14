@@ -1,0 +1,262 @@
+name: 'Terraform Cost Estimation'
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+      - 'bootstrap/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+      - 'bootstrap/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to estimate costs for'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'dev'
+          - 'prod'
+
+env:
+  TF_VERSION: '1.9.0'
+  INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+
+jobs:
+  cost-estimation:
+    name: 'Cost Estimation'
+    runs-on: ubuntu-latest
+    
+    # Permissions pour commenter les PR
+    permissions:
+      contents: read
+      pull-requests: write
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+        
+    - name: Setup Infracost
+      uses: infracost/actions/setup@v2
+      with:
+        api-key: ${{ env.INFRACOST_API_KEY }}
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+        
+    - name: Create cost reports directory
+      run: mkdir -p cost-reports
+      
+    # Estimation des coûts pour dev
+    - name: Terraform init (dev)
+      run: |
+        cd environments/dev
+        terraform init
+        
+    - name: Generate dev cost estimate
+      run: |
+        cd environments/dev
+        cp terraform.tfvars.example terraform.tfvars
+        infracost breakdown \
+          --path . \
+          --terraform-var-file terraform.tfvars \
+          --format json \
+          --out-file ../../cost-reports/dev-cost.json
+          
+    # Estimation des coûts pour prod
+    - name: Terraform init (prod)
+      run: |
+        cd environments/prod
+        terraform init
+        
+    - name: Generate prod cost estimate
+      run: |
+        cd environments/prod
+        cp terraform.tfvars.example terraform.tfvars
+        infracost breakdown \
+          --path . \
+          --terraform-var-file terraform.tfvars \
+          --format json \
+          --out-file ../../cost-reports/prod-cost.json
+          
+    # Comparaison des coûts
+    - name: Compare costs
+      run: |
+        infracost diff \
+          --path cost-reports/dev-cost.json \
+          --compare-to cost-reports/prod-cost.json \
+          --format json \
+          --out-file cost-reports/cost-comparison.json
+          
+    # Génération du rapport pour PR
+    - name: Generate PR comment
+      if: github.event_name == 'pull_request'
+      run: |
+        # Extraire les coûts totaux
+        DEV_COST=$(jq -r '.totalMonthlyCost // "0"' cost-reports/dev-cost.json)
+        PROD_COST=$(jq -r '.totalMonthlyCost // "0"' cost-reports/prod-cost.json)
+        
+        # Calculer la différence
+        DIFF_AMOUNT=$(echo "scale=2; $PROD_COST - $DEV_COST" | bc -l)
+        DIFF_PERCENT=$(echo "scale=1; ($DIFF_AMOUNT / $DEV_COST) * 100" | bc -l)
+        
+        # Déterminer l'icône et la couleur
+        if (( $(echo "$DIFF_AMOUNT > 0" | bc -l) )); then
+          DIFF_ICON="📈"
+          DIFF_COLOR="🔴"
+        else
+          DIFF_ICON="📉"
+          DIFF_COLOR="🟢"
+        fi
+        
+        # Créer le commentaire PR
+        cat > pr-comment.md << EOF
+        ## 💰 Terraform Cost Estimation Report
+        
+        ### 📊 **Cost Summary**
+        
+        | Environment | Monthly Cost | Difference |
+        |-------------|-------------|------------|
+        | **Development** | \$${DEV_COST} | - |
+        | **Production** | \$${PROD_COST} | ${DIFF_ICON} \$${DIFF_AMOUNT} (${DIFF_PERCENT}%) |
+        
+        ### 🔍 **Cost Analysis**
+        
+        ${DIFF_COLOR} **Total difference:** \$${DIFF_AMOUNT}/month (${DIFF_PERCENT}%)
+        
+        $(if (( $(echo "$DIFF_PERCENT > 200" | bc -l) )); then
+          echo "⚠️  **High cost difference detected!** Production costs are ${DIFF_PERCENT}% higher than development."
+          echo ""
+          echo "**Recommendations:**"
+          echo "- Review instance sizes and Auto Scaling configuration"
+          echo "- Consider using Reserved Instances for production"
+          echo "- Verify if all production resources are necessary"
+        elif (( $(echo "$DIFF_PERCENT > 100" | bc -l) )); then
+          echo "✅ **Normal cost difference.** Production typically costs 100-200% more than development."
+        elif (( $(echo "$DIFF_PERCENT < 50" | bc -l) )); then
+          echo "⚠️  **Low cost difference.** Production may not have adequate resources."
+          echo ""
+          echo "**Recommendations:**"
+          echo "- Verify production has sufficient capacity"
+          echo "- Check if High Availability is properly configured"
+        else
+          echo "✅ **Reasonable cost difference** between environments."
+        fi)
+        
+        <details>
+        <summary>📋 <strong>Development Environment Details</strong></summary>
+        
+        \`\`\`
+        $(infracost breakdown --path environments/dev --terraform-var-file environments/dev/terraform.tfvars --format table)
+        \`\`\`
+        
+        </details>
+        
+        <details>
+        <summary>🏭 <strong>Production Environment Details</strong></summary>
+        
+        \`\`\`
+        $(infracost breakdown --path environments/prod --terraform-var-file environments/prod/terraform.tfvars --format table)
+        \`\`\`
+        
+        </details>
+        
+        <details>
+        <summary>🔄 <strong>Detailed Cost Comparison</strong></summary>
+        
+        \`\`\`
+        $(infracost diff --path cost-reports/dev-cost.json --compare-to cost-reports/prod-cost.json --format diff)
+        \`\`\`
+        
+        </details>
+        
+        ### 📈 **Interactive Reports**
+        
+        HTML reports are available in the workflow artifacts:
+        - 📊 [Development Cost Report](cost-reports/dev-cost.html)
+        - 🏭 [Production Cost Report](cost-reports/prod-cost.html)
+        - 🔄 [Cost Comparison Report](cost-reports/cost-comparison.html)
+        
+        ---
+        
+        <sub>💡 *Cost estimates are based on Terraform plan and current AWS pricing. Actual costs may vary based on usage patterns and AWS discounts.*</sub>
+        <sub>🤖 *Generated by Infracost via GitHub Actions*</sub>
+        EOF
+        
+    # Commenter la PR avec les coûts
+    - name: Post cost estimate to PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const comment = fs.readFileSync('pr-comment.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+          
+    # Vérification des seuils de coût
+    - name: Check cost thresholds
+      run: |
+        # Vérifier le coût dev (seuil: 100 USD)
+        DEV_COST=$(jq -r '.totalMonthlyCost' cost-reports/dev-cost.json)
+        if (( $(echo "$DEV_COST > 100" | bc -l) )); then
+          echo "⚠️  WARNING: Dev monthly cost ($DEV_COST USD) exceeds threshold of 100 USD"
+        else
+          echo "✅ Dev monthly cost ($DEV_COST USD) within limits"
+        fi
+        
+        # Vérifier le coût prod (seuil: 500 USD)
+        PROD_COST=$(jq -r '.totalMonthlyCost' cost-reports/prod-cost.json)
+        if (( $(echo "$PROD_COST > 500" | bc -l) )); then
+          echo "⚠️  WARNING: Prod monthly cost ($PROD_COST USD) exceeds threshold of 500 USD"
+        else
+          echo "✅ Prod monthly cost ($PROD_COST USD) within limits"
+        fi
+        
+    # Archiver les rapports
+    - name: Upload cost reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: cost-reports-${{ github.run_id }}
+        path: cost-reports/
+        retention-days: 30
+        
+    # Générer le rapport HTML
+    - name: Generate HTML reports
+      run: |
+        infracost output \
+          --path cost-reports/dev-cost.json \
+          --format html \
+          --out-file cost-reports/dev-cost.html
+          
+        infracost output \
+          --path cost-reports/prod-cost.json \
+          --format html \
+          --out-file cost-reports/prod-cost.html
+          
+        # Générer le rapport HTML de comparaison
+        infracost output \
+          --path cost-reports/cost-comparison.json \
+          --format html \
+          --out-file cost-reports/cost-comparison.html
