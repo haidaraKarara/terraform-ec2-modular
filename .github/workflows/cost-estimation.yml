@@ -7,12 +7,14 @@ on:
       - 'environments/**'
       - 'modules/**'
       - 'bootstrap/**'
+      - '.github/workflows/**'
   push:
     branches: [ main ]
     paths:
       - 'environments/**'
       - 'modules/**'
       - 'bootstrap/**'
+      - '.github/workflows/**'
   workflow_dispatch:
     inputs:
       environment:
