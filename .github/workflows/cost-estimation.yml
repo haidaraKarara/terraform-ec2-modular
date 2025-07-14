@@ -33,6 +33,7 @@ jobs:
   cost-estimation:
     name: 'Cost Estimation'
     runs-on: ubuntu-latest
+    environment: dev
     
     # Permissions pour commenter les PR
     permissions:
@@ -58,7 +59,7 @@ jobs:
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-        aws-region: us-east-1
+        aws-region: ${{ vars.AWS_REGION }}
         
     - name: Create cost reports directory
       run: mkdir -p cost-reports
